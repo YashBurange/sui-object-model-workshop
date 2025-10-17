@@ -39,7 +39,7 @@ const main = async () => {
    *
    * Create a new Transaction instance from the @mysten/sui/transactions module.
    */
-
+  const tx = new Transaction();
   /**
    * Task 2:
    *
@@ -50,7 +50,7 @@ const main = async () => {
    * Resources:
    * - SplitCoins: https://sdk.mystenlabs.com/typescript/transaction-building/basics
    */
-
+  const [feeCoin] = tx.splitCoins(tx.gas, [10]);
   /**
    * Task 3:
    *
@@ -64,7 +64,13 @@ const main = async () => {
    * - Object inputs: https://sdk.mystenlabs.com/typescript/transaction-building/basics#object-references
    */
 
-
+  tx.moveCall({
+    target: `${PACKAGE_ID}::counter::increment`,
+    arguments: [
+      tx.object(COUNTER_OBJECT_ID), // The counter object as input
+      tx.object(feeCoin), // The fee coin as payment
+    ],
+  });
   /**
    * Task 4:
    *
@@ -75,6 +81,18 @@ const main = async () => {
    * Resources:
    * - Observing transaction results: https://sdk.mystenlabs.com/typescript/transaction-building/basics#observing-the-results-of-a-transaction
    */
+  const result = await suiClient.signAndExecuteTransaction({
+    signer: keypair,
+    transaction: tx,
+    options: {
+      showEffects: true,
+      showObjectChanges: true,
+      showBalanceChanges: true,
+      showEvents: true,
+    },
+  });
+  
+  await suiClient.waitForTransaction({ digest: result.digest });
   
 
   /**
@@ -86,4 +104,4 @@ const main = async () => {
    */
 };
 
-main();
+main().catch(console.error);

@@ -33,23 +33,41 @@ const suiClient = new SuiClient({ url: rpcUrl });
  * - https://sdk.mystenlabs.com/typescript/transaction-building/basics#transactions
  */
 const main = async () => {
-  /**
+   /**
    * Task 1:
    *
    * Create a new Transaction instance from the @mysten/sui/transactions module.
    */
 
-  /**
+  const tx = new Transaction();
+
+  // Read the vault to get the actual code on-chain
+  const vaultObject = await suiClient.getObject({
+    id: VAULT_ID,
+    options: { showContent: true },
+  });
+  const code = Number(
+    // @ts-ignore quick field extract from Move object
+    vaultObject.data?.content?.fields?.code ?? 0
+  );
+ /**
    * Task 2:
    *
    * Create a new key using the `key::new` function.
    */
+  const [key] = tx.moveCall({
+    target: `${PACKAGE_ID}::key::new`,
+  });
 
-  /**
+   /**
    * Task 3:
    *
    * Set the key code correctly using the `key::set_code` function.
    */
+  tx.moveCall({
+    target: `${PACKAGE_ID}::key::set_code`,
+    arguments: [tx.object(key), tx.pure.u64(code)],
+  });
 
   /**
    * Task 4:
@@ -57,6 +75,11 @@ const main = async () => {
    * Use the key to withdraw the `SUI` coin from the vault using the `vault::withdraw` function.
    */
   
+  const [coin] = tx.moveCall({
+    target: `${PACKAGE_ID}::vault::withdraw`,
+    typeArguments: ['0x2::sui::SUI'],
+    arguments: [tx.object(VAULT_ID), tx.object(key)],
+  });
 
   /**
    * Task 5:
@@ -64,7 +87,7 @@ const main = async () => {
    * Transfer the `SUI` coin to your account.
    */
 
-
+  tx.transferObjects([coin], keypair.getPublicKey().toSuiAddress());
   /**
    * Task 6:
    *
@@ -76,7 +99,20 @@ const main = async () => {
    * - Observing transaction results: https://sdk.mystenlabs.com/typescript/transaction-building/basics#observing-the-results-of-a-transaction
    */
 
+  const result = await suiClient.signAndExecuteTransaction({
+    signer: keypair,
+    transaction: tx,
+    options: {
+      showEffects: true,
+      showObjectChanges: true,
+      showBalanceChanges: true,
+      showEvents: true,
+    },
+  });
+  await suiClient.waitForTransaction({ digest: result.digest });
 
+  console.log("Digest:", result.digest);
+  console.log("Explorer:", `https://suiexplorer.com/txblock/${result.digest}?network=testnet`);
   /**
    * Task 7: Run the script with the command below and ensure it works!
    * 
@@ -85,5 +121,4 @@ const main = async () => {
    * Verify the transaction on the Sui Explorer: https://suiscan.xyz/testnet/home
    */
 };
-
 main();
